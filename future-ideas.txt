@@ -1,0 +1,121 @@
+Ideas for Automatic Claude Usage Tracking
+==========================================
+Generated as part of Claude Usage Tracker development.
+
+The core challenge: Claude does not expose a public API for reading a user's
+current weekly usage percentage. The /settings/usage page loads the data
+dynamically via authenticated session requests. Below are ideas ranked roughly
+by feasibility.
+
+────────────────────────────────────────────────────────────────────────────────
+1. Browser Extension (Most Feasible)
+────────────────────────────────────────────────────────────────────────────────
+A companion browser extension could:
+  - Listen for navigation to claude.ai/settings/usage
+  - Read the DOM or intercept the XHR/fetch response that delivers usage data
+  - Send the scraped value to the tray app via a local WebSocket or HTTP server
+    (e.g. localhost:27182)
+
+Pros: Works with the real session auth, no credential storage required.
+Cons: Requires a separate extension install; only updates when the user visits
+      the usage page; fragile if Anthropic changes DOM structure.
+
+────────────────────────────────────────────────────────────────────────────────
+2. Authenticated API Call (Undocumented / Reverse-Engineered)
+────────────────────────────────────────────────────────────────────────────────
+Inspect network requests on claude.ai/settings/usage using DevTools to find
+the endpoint that returns usage data. Store a session cookie or API key and
+poll it periodically.
+
+Pros: Fully automatic refresh inside the app.
+Cons: Undocumented endpoint — subject to change or breaking at any time.
+     Requires storing session credentials, which is a security concern.
+     May violate Anthropic's Terms of Service.
+
+────────────────────────────────────────────────────────────────────────────────
+3. Embedded WebView Scraping
+────────────────────────────────────────────────────────────────────────────────
+Use Tauri's WebviewWindow to silently load claude.ai/settings/usage with the
+user's browser profile cookies, inject JavaScript to extract the usage value,
+and relay it via Tauri's `invoke` bridge.
+
+Pros: Reuses the user's real browser session (no credential storage).
+Cons: Complex to implement cross-platform. Tauri WebView may not share cookies
+     with the system browser. WebView sandboxing may block cookie access.
+     Still fragile vs. DOM changes.
+
+────────────────────────────────────────────────────────────────────────────────
+4. OS-Level Browser Cookie Extraction
+────────────────────────────────────────────────────────────────────────────────
+Read the user's actual browser session cookies from disk (Chrome/Firefox/Safari
+profile directories) and use them to make the authenticated usage API call.
+
+Pros: No browser extension needed.
+Cons: Highly OS and browser-version specific. Browser cookie databases are
+     often encrypted (Chrome uses DPAPI on Windows, Keychain on macOS).
+     Extremely invasive — user would need to grant explicit consent.
+     Likely against browser ToS.
+
+────────────────────────────────────────────────────────────────────────────────
+5. Clipboard Monitoring
+────────────────────────────────────────────────────────────────────────────────
+The user copies their usage percentage from the web page; the app detects a
+number in the clipboard that looks like "NN%" and offers to import it.
+
+Pros: Simple, no credential risk.
+Cons: Terrible UX. Requires constant clipboard polling (privacy concern) or
+     a dedicated keyboard shortcut to trigger import.
+
+────────────────────────────────────────────────────────────────────────────────
+6. Official Anthropic API (Future)
+────────────────────────────────────────────────────────────────────────────────
+If Anthropic ever exposes a usage endpoint on api.anthropic.com (similar to
+OpenAI's /dashboard/billing/usage), an API key stored in the settings could
+fetch live data cleanly and safely.
+
+Pros: Clean, stable, official.
+Cons: Does not exist as of April 2026.
+     Would require storing an API key securely (OS keychain integration).
+
+────────────────────────────────────────────────────────────────────────────────
+Recommendation
+────────────────────────────────────────────────────────────────────────────────
+Option 1 (browser extension) is the most practical near-term path that does
+not require storing credentials or violating ToS. Option 6 is the ideal
+long-term solution if Anthropic ever ships it.
+
+Until then, the manual entry feature (slider / text box in the app) planned
+for a future release is the safest and most user-respecting approach.
+
+────────────────────────────────────────────────────────────────────────────────
+Session Tab — Implementation Attempt & Status (April 2026)
+────────────────────────────────────────────────────────────────────────────────
+A Session tab was built and then removed pending a working communication channel.
+
+Desired behaviour:
+  • "Grab Current Usage" button opens a hidden embedded browser to
+    claude.ai/settings/usage (persistent login profile so auth is remembered).
+  • Scraper extracts Session % and Weekly % from the page.
+  • Session tab shows both values with a "grabbed at HH:MM" timestamp.
+  • Weekly tab shows an "Actual Usage" card (weekly %) alongside the existing
+    calculated suggested-usage gauge.
+  • If not logged in, the window surfaces for password + 2FA (5-min timeout),
+    then closes automatically once data is captured.
+
+Archived code: src/lib/SessionView.svelte.bak
+  (also: Rust structs AppState/UsageInfo had captured_* fields; commands were
+  open_usage_scraper, show_scraper_window, receive_captured_usage, process_capture;
+  SCRAPER_INIT_SCRIPT held the 5-strategy JS injector)
+
+What failed and why:
+  1. IPC (window.__TAURI_INTERNALS__.invoke) — not injected into external-URL
+     WebviewWindows on WebKit2GTK. Silent failure; log never transmitted.
+  2. Navigation-interception fallback (navigate to /__tauri_capture__?data=…,
+     catch in on_navigation) — compiled and ran but scrape returned no data;
+     page layout unknown because debug log also couldn't surface.
+
+Most promising next approach:
+  Option 1 from the list above (browser extension + localhost WebSocket).
+  The extension runs inside the real browser session, reads the DOM or
+  intercepts the API response, and POSTs to ws://localhost:27182.
+  The Rust app hosts the WebSocket server and updates the UI on receipt.

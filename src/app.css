@@ -1,0 +1,117 @@
+/* Claude Usage Tracker — Global Styles */
+/* Palette drawn from Claude's marketing material: warm cream, Claude orange, deep charcoal */
+
+:root {
+  --claude-orange:      #DA7756;
+  --claude-orange-deep: #C4612F;
+  --claude-orange-glow: rgba(218, 119, 86, 0.20);
+  --claude-cream:       #F5F0E8;
+  --claude-cream-dark:  #EDE7D9;
+  --claude-text:        #2C2016;
+  --claude-text-muted:  #7A6A5A;
+  --claude-border:      #D4C8B8;
+  --claude-surface:     #FFFFFF;
+  --claude-track:       #E2D9CC;
+
+  /* Semantic colors used in components */
+  --claude-error-bg:          #fff0ec;
+  --claude-error-border:      #f0a090;
+  --claude-error-text:        #8b3020;
+  --claude-close-hover-bg:    #f0d0cc;
+  --claude-close-hover-text:  #c0392b;
+  --claude-success:           #4caf6e;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color-scheme: light;
+}
+
+/* ── Dark theme (Claude-inspired) ─────────────────────────── */
+[data-theme="dark"] {
+  --claude-cream:       #1a1918;
+  --claude-cream-dark:  #252422;
+  --claude-text:        #e8e6e1;
+  --claude-text-muted:  #9b9290;
+  --claude-border:      #38352f;
+  --claude-surface:     #212120;
+  --claude-track:       #2e2c28;
+
+  --claude-error-bg:          #2a1a18;
+  --claude-error-border:      #5a3028;
+  --claude-error-text:        #e08070;
+  --claude-close-hover-bg:    #3a2020;
+  --claude-close-hover-text:  #e05040;
+
+  color-scheme: dark;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--claude-cream);
+  color: var(--claude-text);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  border: none;
+  outline: none;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+a {
+  color: var(--claude-orange);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+input[type="number"],
+select {
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--claude-surface);
+  border: 1.5px solid var(--claude-border);
+  border-radius: var(--radius-sm);
+  color: var(--claude-text);
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input[type="number"]:focus,
+select:focus {
+  border-color: var(--claude-orange);
+  box-shadow: 0 0 0 3px var(--claude-orange-glow);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--claude-orange);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}

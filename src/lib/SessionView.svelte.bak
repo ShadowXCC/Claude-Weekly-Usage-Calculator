@@ -1,0 +1,475 @@
+<script lang="ts">
+  import { onDestroy } from 'svelte'
+  import { invoke } from '@tauri-apps/api/core'
+  import { listen } from '@tauri-apps/api/event'
+
+  // ── Types ────────────────────────────────────────────────────────────────────
+
+  type CaptureState = 'idle' | 'capturing' | 'captured' | 'error'
+
+  interface CapturedData {
+    weekly_pct: number | null
+    session_pct: number | null
+    captured_at: string
+    scraped_url: string | null
+    scraped_title: string | null
+    debug_log: string | null
+  }
+
+  // ── State ────────────────────────────────────────────────────────────────────
+
+  let captureState: CaptureState = $state('idle')
+  let captured: CapturedData | null = $state(null)
+  let errorMsg: string | null = $state(null)
+
+  // Subscribe to the event emitted by Rust when scraping finishes.
+  let unlisten: (() => void) | null = null
+
+  listen<CapturedData>('usage-captured', (event) => {
+    captured = event.payload
+    captureState = 'captured'
+  }).then((fn) => { unlisten = fn })
+
+  onDestroy(() => { unlisten?.() })
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
+
+  async function grabUsage() {
+    captureState = 'capturing'
+    errorMsg = null
+    try {
+      await invoke('open_usage_scraper')
+    } catch (e) {
+      errorMsg = String(e)
+      captureState = 'error'
+    }
+  }
+
+  function reset() {
+    captureState = 'idle'
+    captured = null
+    errorMsg = null
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  function fmtPct(n: number | null): string {
+    if (n === null || n === undefined) return '—'
+    return n.toFixed(1) + '%'
+  }
+</script>
+
+<div class="session-view">
+
+  <!-- ── IDLE ────────────────────────────────────────────────────────────────── -->
+  {#if captureState === 'idle'}
+    <div class="idle-state">
+      <div class="idle-icon">
+        <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+          <circle cx="26" cy="26" r="24" stroke="var(--claude-border)" stroke-width="2"/>
+          <path d="M18 26 L24 32 L34 20" stroke="var(--claude-orange)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+      <h2 class="idle-title">Grab Usage Data</h2>
+      <p class="idle-desc">
+        Opens the Claude usage page in a background window, reads your current
+        session and weekly usage, then closes automatically.
+      </p>
+      <button class="grab-btn" onclick={grabUsage}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        Grab Current Usage
+      </button>
+    </div>
+
+  <!-- ── CAPTURING ───────────────────────────────────────────────────────────── -->
+  {:else if captureState === 'capturing'}
+    <div class="capturing-state">
+      <div class="spinner-wrap">
+        <svg class="spinner" width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <circle cx="24" cy="24" r="20" stroke="var(--claude-border)" stroke-width="3"/>
+          <path d="M24 4 A20 20 0 0 1 44 24" stroke="var(--claude-orange)" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h2 class="capturing-title">Grabbing Usage…</h2>
+      <p class="capturing-desc">
+        Fetching your usage data in the background. This will finish
+        automatically in a few seconds.
+        <br/><br/>
+        If a sign-in window appears, log into Claude and it will close on its own.
+        Your session is remembered for future grabs.
+      </p>
+    </div>
+
+  <!-- ── CAPTURED ────────────────────────────────────────────────────────────── -->
+  {:else if captureState === 'captured' && captured}
+    <div class="captured-state">
+      <div class="captured-header">
+        <div class="captured-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h2 class="captured-title">Usage Captured</h2>
+        <p class="captured-at">as of {captured.captured_at}</p>
+      </div>
+
+      <div class="usage-grid">
+        <div class="usage-card usage-card--highlight">
+          <div class="usage-card-label">Session Usage</div>
+          <div class="usage-card-value">{fmtPct(captured.session_pct)}</div>
+          {#if captured.session_pct === null}
+            <div class="usage-card-note">Not detected on page</div>
+          {/if}
+        </div>
+        <div class="usage-card">
+          <div class="usage-card-label">Weekly Usage</div>
+          <div class="usage-card-value">{fmtPct(captured.weekly_pct)}</div>
+          {#if captured.weekly_pct === null}
+            <div class="usage-card-note">Not detected on page</div>
+          {/if}
+        </div>
+      </div>
+
+      {#if captured.session_pct === null && captured.weekly_pct === null}
+        <div class="no-data-note">
+          Usage data could not be detected automatically. Claude's page layout may
+          have changed. You can still check usage manually on the Claude usage page.
+        </div>
+      {/if}
+
+      <!-- Scrape diagnostic — helps confirm the right page was hit -->
+      <details class="debug-details">
+        <summary class="debug-summary">Scrape details</summary>
+        <div class="debug-body">
+          {#if captured.scraped_url}
+            <div class="debug-row">
+              <span class="debug-key">URL</span>
+              <span class="debug-val">{captured.scraped_url}</span>
+            </div>
+          {/if}
+          {#if captured.scraped_title}
+            <div class="debug-row">
+              <span class="debug-key">Title</span>
+              <span class="debug-val">{captured.scraped_title}</span>
+            </div>
+          {/if}
+          {#if captured.debug_log}
+            <pre class="debug-log">{captured.debug_log}</pre>
+          {/if}
+        </div>
+      </details>
+
+      <div class="captured-actions">
+        <button class="grab-btn" onclick={grabUsage}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+  <!-- ── ERROR ───────────────────────────────────────────────────────────────── -->
+  {:else if captureState === 'error'}
+    <div class="error-state">
+      <div class="error-icon">!</div>
+      <h2 class="error-title">Failed to Open</h2>
+      {#if errorMsg}
+        <code class="error-msg">{errorMsg}</code>
+      {/if}
+      <button class="grab-btn" onclick={reset}>Try Again</button>
+    </div>
+  {/if}
+
+</div>
+
+<style>
+  .session-view {
+    padding: 28px 20px 32px;
+  }
+
+  /* ── Idle ──────────────────────────────────────────────────── */
+  .idle-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .idle-icon {
+    margin-bottom: 4px;
+  }
+
+  .idle-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--claude-text);
+    letter-spacing: -0.3px;
+  }
+
+  .idle-desc {
+    font-size: 13px;
+    color: var(--claude-text-muted);
+    max-width: 300px;
+    line-height: 1.6;
+  }
+
+  /* ── Grab / refresh button ─────────────────────────────────── */
+  .grab-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--claude-orange);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 11px 24px;
+    margin-top: 4px;
+    transition: background 0.15s;
+  }
+
+  .grab-btn:hover {
+    background: var(--claude-orange-deep);
+  }
+
+  /* ── Capturing ─────────────────────────────────────────────── */
+  .capturing-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .spinner-wrap {
+    margin-bottom: 4px;
+    animation: spin 1.2s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .capturing-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--claude-text);
+    letter-spacing: -0.3px;
+  }
+
+  .capturing-desc {
+    font-size: 13px;
+    color: var(--claude-text-muted);
+    max-width: 300px;
+    line-height: 1.6;
+  }
+
+  /* ── Captured ──────────────────────────────────────────────── */
+  .captured-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .captured-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .captured-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(218, 119, 86, 0.12);
+    color: var(--claude-orange);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  .captured-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--claude-text);
+    letter-spacing: -0.3px;
+  }
+
+  .captured-at {
+    font-size: 12px;
+    color: var(--claude-text-muted);
+  }
+
+  .usage-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .usage-card {
+    background: var(--claude-surface);
+    border: 1.5px solid var(--claude-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    text-align: center;
+  }
+
+  .usage-card--highlight {
+    border-color: var(--claude-orange);
+    background: rgba(218, 119, 86, 0.05);
+  }
+
+  .usage-card-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--claude-text-muted);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .usage-card-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--claude-text);
+    letter-spacing: -0.5px;
+  }
+
+  .usage-card--highlight .usage-card-value {
+    color: var(--claude-orange);
+  }
+
+  .usage-card-note {
+    font-size: 11px;
+    color: var(--claude-text-muted);
+    margin-top: 4px;
+  }
+
+  .no-data-note {
+    font-size: 12px;
+    color: var(--claude-text-muted);
+    background: var(--claude-cream-dark);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    line-height: 1.6;
+    text-align: center;
+    max-width: 340px;
+  }
+
+  /* ── Debug details ─────────────────────────────────────────── */
+  .debug-details {
+    width: 100%;
+    background: var(--claude-cream-dark);
+    border: 1px solid var(--claude-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .debug-summary {
+    font-size: 11px;
+    color: var(--claude-text-muted);
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .debug-body {
+    padding: 8px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .debug-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .debug-key {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--claude-text-muted);
+    font-weight: 600;
+  }
+
+  .debug-val {
+    font-size: 11px;
+    color: var(--claude-text);
+    word-break: break-all;
+  }
+
+  .debug-log {
+    font-size: 10px;
+    font-family: monospace;
+    color: var(--claude-text-muted);
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 4px 0 0;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--claude-surface);
+    border: 1px solid var(--claude-border);
+    border-radius: 4px;
+    padding: 8px;
+  }
+
+  .captured-actions {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* ── Error ─────────────────────────────────────────────────── */
+  .error-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .error-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #fff0ec;
+    color: #c0392b;
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .error-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--claude-text);
+  }
+
+  .error-msg {
+    font-size: 11px;
+    color: #8b3020;
+    background: #fff0ec;
+    border: 1px solid #f0a090;
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    word-break: break-all;
+    max-width: 340px;
+  }
+</style>

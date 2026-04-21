@@ -1,0 +1,33 @@
+/* Early Mac — high-contrast black-on-white with squared corners. */
+
+html[data-skin="mac"] {
+  --claude-orange:      #000000;
+  --claude-orange-deep: #000000;
+  --claude-orange-glow: rgba(0, 0, 0, 0.12);
+  --claude-cream:       #ffffff;
+  --claude-cream-dark:  #eaeaea;
+  --claude-text:        #000000;
+  --claude-text-muted:  #4a4a4a;
+  --claude-border:      #000000;
+  --claude-surface:     #ffffff;
+  --claude-track:       #d0d0d0;
+  --claude-success:     #000000;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+
+  color-scheme: light;
+  font-family: 'ChicagoFLF', 'Chicago', 'Geneva', 'Lucida Grande', system-ui, sans-serif;
+}
+
+html[data-skin="mac"] body {
+  background:
+    repeating-conic-gradient(
+      from 0deg at 1px 1px,
+      #000 0deg 90deg,
+      transparent 90deg 180deg
+    );
+  background-size: 2px 2px;
+  background-color: #ffffff;
+}

@@ -1,0 +1,17 @@
+/* Catppuccin Mocha — trendy pastel dark palette with pink/mauve accent. */
+
+html[data-skin="catppuccin-mocha"] {
+  --claude-orange:      #f5c2e7;
+  --claude-orange-deep: #cba6f7;
+  --claude-orange-glow: rgba(245, 194, 231, 0.25);
+  --claude-cream:       #1e1e2e;
+  --claude-cream-dark:  #181825;
+  --claude-text:        #cdd6f4;
+  --claude-text-muted:  #a6adc8;
+  --claude-border:      #45475a;
+  --claude-surface:     #313244;
+  --claude-track:       #45475a;
+  --claude-success:     #a6e3a1;
+
+  color-scheme: dark;
+}

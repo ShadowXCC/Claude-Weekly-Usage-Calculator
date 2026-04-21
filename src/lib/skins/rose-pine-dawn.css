@@ -1,0 +1,17 @@
+/* Rose Pine Dawn — warm blush/rose pastel on cream with rose/love accent. */
+
+html[data-skin="rose-pine-dawn"] {
+  --claude-orange:      #d7827e;
+  --claude-orange-deep: #b4637a;
+  --claude-orange-glow: rgba(215, 130, 126, 0.25);
+  --claude-cream:       #faf4ed;
+  --claude-cream-dark:  #fffaf3;
+  --claude-text:        #575279;
+  --claude-text-muted:  #797593;
+  --claude-border:      #dfdad9;
+  --claude-surface:     #f2e9e1;
+  --claude-track:       #eee9de;
+  --claude-success:     #286983;
+
+  color-scheme: light;
+}

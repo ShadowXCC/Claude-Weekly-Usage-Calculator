@@ -1,0 +1,17 @@
+/* Solarized Light — same palette inverted: warm cream background, yellow accent. */
+
+html[data-skin="solarized-light"] {
+  --claude-orange:      #b58900;
+  --claude-orange-deep: #8a6800;
+  --claude-orange-glow: rgba(181, 137, 0, 0.25);
+  --claude-cream:       #fdf6e3;
+  --claude-cream-dark:  #eee8d5;
+  --claude-text:        #586e75;
+  --claude-text-muted:  #839496;
+  --claude-border:      #d6cfb8;
+  --claude-surface:     #fdf6e3;
+  --claude-track:       #e8e0c8;
+  --claude-success:     #859900;
+
+  color-scheme: light;
+}

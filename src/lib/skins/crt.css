@@ -1,0 +1,32 @@
+/* CRT Green — classic phosphor terminal look.
+   Activates when <html data-skin="crt">. Works via palette variable overrides
+   so it cascades into scoped Svelte components without needing :global. */
+
+html[data-skin="crt"] {
+  --claude-orange:      #39ff14;
+  --claude-orange-deep: #2cd50f;
+  --claude-orange-glow: rgba(57, 255, 20, 0.25);
+  --claude-cream:       #031706;
+  --claude-cream-dark:  #052c0a;
+  --claude-text:        #9dffae;
+  --claude-text-muted:  #4fa760;
+  --claude-border:      #0d4a18;
+  --claude-surface:     #041f08;
+  --claude-track:       #083c12;
+  --claude-success:     #8aff9a;
+
+  color-scheme: dark;
+  font-family: 'VT323', 'Courier New', ui-monospace, monospace;
+}
+
+html[data-skin="crt"] body {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.0) 0px,
+      rgba(0, 0, 0, 0.0) 2px,
+      rgba(0, 0, 0, 0.18) 3px,
+      rgba(0, 0, 0, 0.0) 4px
+    ),
+    radial-gradient(ellipse at center, #082810 0%, #020b03 100%);
+}

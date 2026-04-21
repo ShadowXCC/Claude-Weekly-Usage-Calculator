@@ -1,0 +1,17 @@
+/* Sepia / Paper — warm off-white reading-friendly palette with sienna accent. */
+
+html[data-skin="sepia"] {
+  --claude-orange:      #a0522d;
+  --claude-orange-deep: #7a3d20;
+  --claude-orange-glow: rgba(160, 82, 45, 0.20);
+  --claude-cream:       #f4ecd8;
+  --claude-cream-dark:  #ebe0c5;
+  --claude-text:        #4b3b2a;
+  --claude-text-muted:  #8a7355;
+  --claude-border:      #d9c8a7;
+  --claude-surface:     #faf3e0;
+  --claude-track:       #e0d2b3;
+  --claude-success:     #5a7a3c;
+
+  color-scheme: light;
+}

@@ -1,0 +1,17 @@
+/* Nord — cool arctic blues and frost cyan accent. */
+
+html[data-skin="nord"] {
+  --claude-orange:      #88c0d0;
+  --claude-orange-deep: #5e81ac;
+  --claude-orange-glow: rgba(136, 192, 208, 0.25);
+  --claude-cream:       #2e3440;
+  --claude-cream-dark:  #3b4252;
+  --claude-text:        #eceff4;
+  --claude-text-muted:  #d8dee9;
+  --claude-border:      #4c566a;
+  --claude-surface:     #3b4252;
+  --claude-track:       #434c5e;
+  --claude-success:     #a3be8c;
+
+  color-scheme: dark;
+}

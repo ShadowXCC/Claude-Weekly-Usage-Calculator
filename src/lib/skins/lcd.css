@@ -1,0 +1,36 @@
+/* LCD Seven-Seg — calculator-display vibe: olive backdrop, dark digits,
+   squared corners, and a tech-mono font stack. */
+
+html[data-skin="lcd"] {
+  --claude-orange:      #1f1f1f;
+  --claude-orange-deep: #000000;
+  --claude-orange-glow: rgba(0, 0, 0, 0.12);
+  --claude-cream:       #b7c39c;
+  --claude-cream-dark:  #a9b58c;
+  --claude-text:        #141410;
+  --claude-text-muted:  #4a4f3a;
+  --claude-border:      #6b7356;
+  --claude-surface:     #c2cda7;
+  --claude-track:       #94a07a;
+  --claude-success:     #1a1a1a;
+
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+
+  color-scheme: light;
+  font-family: 'DSEG7 Classic', 'Share Tech Mono', 'Courier New', ui-monospace, monospace;
+  letter-spacing: 0.02em;
+}
+
+html[data-skin="lcd"] body {
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.05) 0px,
+      rgba(0, 0, 0, 0.05) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    linear-gradient(180deg, #b7c39c 0%, #9fab84 100%);
+}

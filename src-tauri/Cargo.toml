@@ -1,17 +1,22 @@
 [package]
-name = "claude-usage-tracker"
+name = "claude-weekly-usage-calculator"
 version = "0.1.0"
-description = "Claude Weekly Usage Tracker"
+description = "Claude Weekly Usage Calculator"
 authors = []
 edition = "2021"
+default-run = "claude-weekly-usage-calculator"
 
 [lib]
-name = "claude_usage_tracker_lib"
+name = "claude_weekly_usage_calculator_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "claude-usage-tracker"
+name = "claude-weekly-usage-calculator"
 path = "src/main.rs"
+
+[[bin]]
+name = "claude-usage"
+path = "src/bin/claude-usage.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -24,8 +29,11 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = { version = "0.9", features = ["serde"] }
 tiny-skia = "0.11"
 image = { version = "0.25", default-features = false, features = ["png"] }
+dirs = "5"
+clap = { version = "4", features = ["derive"] }
 
 [profile.release]
 panic = "abort"

@@ -1,0 +1,17 @@
+/* GitHub Light — clean neutral, Primer's canvas/fg/border tokens, blue accent. */
+
+html[data-skin="github-light"] {
+  --claude-orange:      #0969da;
+  --claude-orange-deep: #0550ae;
+  --claude-orange-glow: rgba(9, 105, 218, 0.20);
+  --claude-cream:       #ffffff;
+  --claude-cream-dark:  #f6f8fa;
+  --claude-text:        #1f2328;
+  --claude-text-muted:  #656d76;
+  --claude-border:      #d1d9e0;
+  --claude-surface:     #ffffff;
+  --claude-track:       #eaeef2;
+  --claude-success:     #1a7f37;
+
+  color-scheme: light;
+}

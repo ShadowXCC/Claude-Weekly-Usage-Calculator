@@ -1,0 +1,17 @@
+/* Catppuccin Latte — light counterpart of Mocha. Matches Mocha's pink accent slot. */
+
+html[data-skin="catppuccin-latte"] {
+  --claude-orange:      #ea76cb;
+  --claude-orange-deep: #8839ef;
+  --claude-orange-glow: rgba(234, 118, 203, 0.25);
+  --claude-cream:       #eff1f5;
+  --claude-cream-dark:  #e6e9ef;
+  --claude-text:        #4c4f69;
+  --claude-text-muted:  #6c6f85;
+  --claude-border:      #bcc0cc;
+  --claude-surface:     #ccd0da;
+  --claude-track:       #bcc0cc;
+  --claude-success:     #40a02b;
+
+  color-scheme: light;
+}

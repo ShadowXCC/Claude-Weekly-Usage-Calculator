@@ -1,0 +1,17 @@
+/* Dracula — high-contrast dark purple with neon pink accent. */
+
+html[data-skin="dracula"] {
+  --claude-orange:      #ff79c6;
+  --claude-orange-deep: #bd93f9;
+  --claude-orange-glow: rgba(255, 121, 198, 0.25);
+  --claude-cream:       #282a36;
+  --claude-cream-dark:  #21222c;
+  --claude-text:        #f8f8f2;
+  --claude-text-muted:  #6272a4;
+  --claude-border:      #44475a;
+  --claude-surface:     #44475a;
+  --claude-track:       #343746;
+  --claude-success:     #50fa7b;
+
+  color-scheme: dark;
+}

@@ -1,22 +1,39 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core'
   import { openUrl } from '@tauri-apps/plugin-opener'
+  import { arcPath, formatPct } from './gauge'
+  import WeekBarSegmented from './WeekBarSegmented.svelte'
 
   interface UsageInfo {
     suggested_pct: number
+    remaining_pct: number
     time_until_reset: string
     reset_weekday: number
     reset_hour: number
     reset_minute: number
     last_refreshed: string
+    tz: string
+    tz_display: string
   }
 
   const WEEKDAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
-  let { refreshTick }: { refreshTick: number } = $props()
+  let {
+    refreshTick,
+    displayInverse,
+    weekBarSegmented,
+    a11yAnnounce,
+    latestThreshold,
+  }: {
+    refreshTick: number
+    displayInverse: boolean
+    weekBarSegmented: boolean
+    a11yAnnounce: boolean
+    latestThreshold: number | null
+  } = $props()
 
-  let info: UsageInfo | null = $state(null)
-  let error: string | null = $state(null)
+  let info = $state<UsageInfo | null>(null)
+  let error = $state<string | null>(null)
 
   async function fetchInfo() {
     try {
@@ -27,15 +44,26 @@
     }
   }
 
-  // Fetch on mount and whenever refreshTick changes
   $effect(() => {
-    void refreshTick // depend on it
+    void refreshTick
     fetchInfo()
   })
 
-  function formatPct(pct: number): string {
-    return pct.toFixed(1)
-  }
+  let shownPct = $derived(info ? (displayInverse ? info.remaining_pct : info.suggested_pct) : 0)
+  // Gauge arc stays aligned with the center number (fuel-gauge metaphor).
+  let gaugeArcPct = $derived(info ? (displayInverse ? info.remaining_pct : info.suggested_pct) : 0)
+  // Linear bar always represents time elapsed through the week (progress metaphor).
+  let barFillPct = $derived(info ? info.suggested_pct : 0)
+
+  // Gauge label/aria strings flip with the inverse toggle.
+  let headlineLabel = $derived(displayInverse ? 'remaining' : 'suggested')
+  let gaugeAriaLabel = $derived(
+    info
+      ? displayInverse
+        ? `${formatPct(info.remaining_pct)} percent of the weekly budget remaining`
+        : `${formatPct(info.suggested_pct)} percent used (suggested)`
+      : 'Loading',
+  )
 
   function resetLabel(info: UsageInfo): string {
     const day = WEEKDAY_NAMES[info.reset_weekday] ?? 'Unknown'
@@ -47,86 +75,94 @@
     return `${day}s at ${h12}:${mStr} ${ampm}`
   }
 
-  // The arc SVG for the big display circle
-  function arcPath(pct: number, r: number, cx: number, cy: number): string {
-    const frac = Math.min(Math.max(pct / 100, 0), 1)
-    if (frac >= 0.9999) {
-      // Full circle
-      return `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.001} ${cy - r} Z`
-    }
-    const angle = frac * 2 * Math.PI - Math.PI / 2  // clockwise from top
-    const startAngle = -Math.PI / 2
-    const x1 = cx + r * Math.cos(startAngle)
-    const y1 = cy + r * Math.sin(startAngle)
-    const x2 = cx + r * Math.cos(angle)
-    const y2 = cy + r * Math.sin(angle)
-    const largeArc = frac > 0.5 ? 1 : 0
-    return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`
-  }
-
   async function openUsagePage() {
     await openUrl('https://claude.ai/settings/usage')
   }
+
+  // ── Threshold live-region announcement ─────────────────────
+  // We keep a local, user-friendly message and update it on each new event.
+  let announce = $state('')
+  $effect(() => {
+    if (!a11yAnnounce || latestThreshold === null) return
+    const suffix = displayInverse
+      ? `${100 - latestThreshold}% of your weekly budget remains`
+      : `${latestThreshold}% of your weekly budget has been used`
+    announce = suffix
+  })
 </script>
 
 <div class="main-view">
   {#if error}
-    <div class="error-card">
+    <div class="error-card" role="alert">
       <p>Failed to load usage info:</p>
       <code>{error}</code>
     </div>
   {:else if info}
     <!-- Big circular gauge -->
     <div class="gauge-section">
-      <div class="gauge-wrap">
+      <div
+        class="gauge-wrap"
+        role="progressbar"
+        aria-valuenow={Math.round(shownPct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={gaugeAriaLabel}
+      >
         <svg class="gauge-svg" viewBox="0 0 120 120" width="180" height="180" aria-hidden="true">
-          <!-- Track ring -->
           <circle
             cx="60" cy="60" r="50"
             fill="none"
             stroke="var(--claude-track)"
             stroke-width="10"
           />
-          <!-- Filled arc -->
           <path
-            d={arcPath(info.suggested_pct, 50, 60, 60)}
+            d={arcPath(gaugeArcPct, 50, 60, 60)}
             fill="none"
             stroke="var(--claude-orange)"
             stroke-width="10"
             stroke-linecap="round"
           />
-          <!-- Center label -->
-          <text x="60" y="56" text-anchor="middle" class="gauge-pct">{formatPct(info.suggested_pct)}%</text>
-          <text x="60" y="72" text-anchor="middle" class="gauge-sub">suggested</text>
+          <text x="60" y="56" text-anchor="middle" class="gauge-pct">{formatPct(shownPct)}%</text>
+          <text x="60" y="72" text-anchor="middle" class="gauge-sub">{headlineLabel}</text>
         </svg>
       </div>
       <p class="gauge-caption">
-        You should be <strong>at or above</strong> this usage to stay on track for 100% weekly usage.
+        {#if displayInverse}
+          You have <strong>{formatPct(shownPct)}%</strong> of the week remaining.
+        {:else}
+          You should be <strong>at or above</strong> this usage to stay on track for 100% weekly usage.
+        {/if}
       </p>
     </div>
 
     <!-- Progress bar section -->
     <div class="bar-section">
       <div class="bar-header">
-        <span class="bar-label">Weekly Usage Progress</span>
-        <span class="bar-pct">{formatPct(info.suggested_pct)}%</span>
+        <span class="bar-label">{displayInverse ? 'Weekly Budget Remaining' : 'Weekly Usage Progress'}</span>
+        <span class="bar-pct">{formatPct(shownPct)}%</span>
       </div>
 
-      <div class="bar-track" role="progressbar" aria-valuenow={info.suggested_pct} aria-valuemin={0} aria-valuemax={100}>
-        <div class="bar-fill" style="width: {Math.min(info.suggested_pct, 100)}%"></div>
-        <div class="bar-marker" style="left: {Math.min(info.suggested_pct, 100)}%">
-          <div class="bar-marker-line"></div>
-          <div class="bar-marker-label">at or above</div>
+      {#if weekBarSegmented}
+        <WeekBarSegmented fillPct={barFillPct} resetWeekday={info.reset_weekday} />
+      {:else}
+        <div class="bar-track">
+          <div class="bar-fill" style="width: {Math.min(barFillPct, 100)}%"></div>
+          {#if !displayInverse}
+            <div class="bar-marker" style="left: {Math.min(barFillPct, 100)}%">
+              <div class="bar-marker-line"></div>
+              <div class="bar-marker-label">at or above</div>
+            </div>
+          {/if}
         </div>
-      </div>
 
-      <div class="bar-scale">
-        <span>0%</span>
-        <span>25%</span>
-        <span>50%</span>
-        <span>75%</span>
-        <span>100%</span>
-      </div>
+        <div class="bar-scale">
+          <span>0%</span>
+          <span>25%</span>
+          <span>50%</span>
+          <span>75%</span>
+          <span>100%</span>
+        </div>
+      {/if}
     </div>
 
     <!-- Info cards row -->
@@ -140,7 +176,7 @@
         <div class="info-card-value">{resetLabel(info)}</div>
       </div>
       <div class="info-card info-card--full">
-        <div class="info-card-label">Last Updated</div>
+        <div class="info-card-label">Last Updated · {info.tz_display}</div>
         <div class="info-card-value">{info.last_refreshed}</div>
       </div>
     </div>
@@ -163,16 +199,13 @@
         Refresh
       </button>
     </div>
-
-    <!-- Future: manual usage input placeholder -->
-    <!-- TODO: Add manual current usage input (slider + text box).
-         When manually entered, display alongside suggested but do not use for any math.
-         See future-ideas.txt for automatic usage tracking ideas. -->
-
   {:else}
     <div class="loading">Loading usage data…</div>
   {/if}
 </div>
+
+<!-- Live region for threshold announcements (screen readers only). -->
+<div role="status" aria-live="polite" class="sr-only">{announce}</div>
 
 <style>
   .main-view {
@@ -182,7 +215,6 @@
     padding: 28px 20px 32px;
   }
 
-  /* ── Error ─────────────────────────────────────────────── */
   .error-card {
     background: var(--claude-error-bg);
     border: 1.5px solid var(--claude-error-border);
@@ -198,7 +230,6 @@
     word-break: break-all;
   }
 
-  /* ── Gauge ─────────────────────────────────────────────── */
   .gauge-section {
     display: flex;
     flex-direction: column;
@@ -241,7 +272,6 @@
     font-weight: 600;
   }
 
-  /* ── Bar ──────────────────────────────────────────────── */
   .bar-section {
     background: var(--claude-surface);
     border-radius: var(--radius-md);
@@ -322,7 +352,6 @@
     margin-top: 18px;
   }
 
-  /* ── Info cards ────────────────────────────────────────── */
   .info-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -355,7 +384,6 @@
     color: var(--claude-text);
   }
 
-  /* ── Actions ──────────────────────────────────────────── */
   .actions {
     display: flex;
     gap: 10px;
@@ -394,13 +422,10 @@
     color: var(--claude-orange);
   }
 
-  /* ── Loading ──────────────────────────────────────────── */
   .loading {
     text-align: center;
     padding: 60px 0;
     color: var(--claude-text-muted);
     font-size: 14px;
   }
-
-
 </style>

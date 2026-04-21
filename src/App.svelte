@@ -1,49 +1,147 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte'
   import { invoke } from '@tauri-apps/api/core'
+  import { listen } from '@tauri-apps/api/event'
   import { openUrl } from '@tauri-apps/plugin-opener'
   import { getCurrentWindow } from '@tauri-apps/api/window'
   import MainView from './lib/MainView.svelte'
   import SettingsView from './lib/SettingsView.svelte'
+  import SimulatorView from './lib/SimulatorView.svelte'
+  import { applyAccent, DEFAULT_ACCENT } from './lib/accent'
 
   const appWindow = getCurrentWindow()
 
-  type Tab = 'main' | 'settings'
-  let activeTab: Tab = $state('main')
+  type Tab = 'main' | 'simulator' | 'settings'
+  type ThemeMode = 'light' | 'dark' | 'auto'
+
+  const _storedTab = (localStorage.getItem('claude-usage-tab') as Tab) ?? 'main'
+  let activeTab: Tab = $state(_storedTab)
+  $effect(() => { localStorage.setItem('claude-usage-tab', activeTab) })
 
   // ── Theme ───────────────────────────────────────────────────
-  // Apply synchronously before first render to avoid flash
-  const _storedTheme = (localStorage.getItem('claude-usage-theme') as 'light' | 'dark') ?? 'light'
-  document.documentElement.setAttribute('data-theme', _storedTheme)
+  // Migrate the old two-value key on first run.
+  const _legacyTheme = localStorage.getItem('claude-usage-theme')
+  const _storedMode = (localStorage.getItem('claude-usage-theme-mode') as ThemeMode | null)
+    ?? (_legacyTheme === 'dark' || _legacyTheme === 'light' ? (_legacyTheme as ThemeMode) : 'auto')
 
-  let theme = $state<'light' | 'dark'>(_storedTheme)
+  let themeMode = $state<ThemeMode>(_storedMode)
+  const _initialPrefersDark =
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  let systemPrefersDark = $state(_initialPrefersDark)
+
+  // Apply initial data-theme synchronously to prevent FOUC.
+  document.documentElement.setAttribute(
+    'data-theme',
+    _storedMode === 'dark' || (_storedMode === 'auto' && _initialPrefersDark) ? 'dark' : 'light',
+  )
+
+  let mql: MediaQueryList | undefined
+  const onSystemThemeChange = (e: MediaQueryListEvent) => { systemPrefersDark = e.matches }
+
+  const resolvedTheme = $derived<'light' | 'dark'>(
+    themeMode === 'auto' ? (systemPrefersDark ? 'dark' : 'light') : themeMode,
+  )
 
   $effect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('claude-usage-theme', theme)
+    document.documentElement.setAttribute('data-theme', resolvedTheme)
+    localStorage.setItem('claude-usage-theme-mode', themeMode)
   })
 
-  function setTheme(t: 'light' | 'dark') {
-    theme = t
-  }
+  function setThemeMode(t: ThemeMode) { themeMode = t }
+
+  // ── Skin (UI-only, persisted in localStorage) ──────────────
+  type Skin =
+    | 'default'
+    | 'crt'
+    | 'lcd'
+    | 'mac'
+    | 'solarized-dark'
+    | 'solarized-light'
+    | 'nord'
+    | 'dracula'
+    | 'catppuccin-mocha'
+    | 'catppuccin-latte'
+    | 'github-light'
+    | 'sepia'
+    | 'rose-pine-dawn'
+  const _storedSkin = (localStorage.getItem('claude-usage-skin') as Skin) ?? 'default'
+  let skin: Skin = $state(_storedSkin)
+  $effect(() => {
+    document.documentElement.setAttribute('data-skin', skin)
+    localStorage.setItem('claude-usage-skin', skin)
+  })
+
+  // ── Display prefs from backend (inverse, accent, segmented bar, a11y) ─────
+  let displayInverse: boolean = $state(false)
+  let accentHex: string = $state(DEFAULT_ACCENT)
+  let trayMode: 'ring' | 'number' | 'emoji' = $state('ring')
+  let weekBarSegmented: boolean = $state(
+    localStorage.getItem('claude-usage-week-bar-segmented') === 'true',
+  )
+  let a11yAnnounce: boolean = $state(true)
+
+  $effect(() => {
+    applyAccent(accentHex)
+  })
+  $effect(() => {
+    localStorage.setItem('claude-usage-week-bar-segmented', String(weekBarSegmented))
+  })
+
+  // ── Threshold event (for a11y live region) ──────────────────
+  let latestThreshold: number | null = $state(null)
+  let unlistenThreshold: (() => void) | undefined
 
   // ── Auto-refresh every 60s ──────────────────────────────────
   let refreshInterval: ReturnType<typeof setInterval> | undefined
+  let refreshTick: number = $state(0)
 
-  onMount(() => {
-    refreshInterval = setInterval(() => {
-      refreshTick += 1
-    }, 60_000)
+  onMount(async () => {
+    // Hook up system theme listener.
+    mql = window.matchMedia('(prefers-color-scheme: dark)')
+    mql.addEventListener('change', onSystemThemeChange)
+
+    // Load display prefs from backend (they flow through get_usage_info).
+    try {
+      const info = await invoke<{
+        display_inverse: boolean
+        accent_hex: string
+        tray_mode: 'ring' | 'number' | 'emoji'
+        a11y_announce_thresholds: boolean
+      }>('get_usage_info')
+      displayInverse = info.display_inverse
+      accentHex = info.accent_hex
+      trayMode = info.tray_mode
+      a11yAnnounce = info.a11y_announce_thresholds
+    } catch {}
+
+    unlistenThreshold = await listen<number>('threshold-crossed', (evt) => {
+      latestThreshold = evt.payload
+    })
+
+    refreshInterval = setInterval(() => { refreshTick += 1 }, 60_000)
   })
 
   onDestroy(() => {
     if (refreshInterval !== undefined) clearInterval(refreshInterval)
+    mql?.removeEventListener('change', onSystemThemeChange)
+    unlistenThreshold?.()
   })
-
-  let refreshTick: number = $state(0)
 
   async function openUsagePage() {
     await openUrl('https://claude.ai/settings/usage')
+  }
+
+  function onDisplayPrefsChanged(next: {
+    displayInverse: boolean
+    trayMode: 'ring' | 'number' | 'emoji'
+    accentHex: string
+    a11yAnnounce: boolean
+  }) {
+    displayInverse = next.displayInverse
+    trayMode = next.trayMode
+    accentHex = next.accentHex
+    a11yAnnounce = next.a11yAnnounce
+    refreshTick += 1
   }
 </script>
 
@@ -52,7 +150,7 @@
   <div class="titlebar" data-tauri-drag-region>
     <div class="titlebar-left" data-tauri-drag-region>
       <div class="logo-mark" data-tauri-drag-region>U</div>
-      <span class="app-title" data-tauri-drag-region>Claude Usage Tracker</span>
+      <span class="app-title" data-tauri-drag-region>Claude Weekly Usage Calculator</span>
     </div>
     <div class="titlebar-controls">
       <button
@@ -94,18 +192,28 @@
   </div>
 
   <!-- Tab bar -->
-  <nav class="tabs">
+  <nav class="tabs" aria-label="Primary">
     <button
       class="tab-btn"
       class:active={activeTab === 'main'}
       onclick={() => activeTab = 'main'}
+      aria-current={activeTab === 'main' ? 'page' : undefined}
     >
       Weekly
     </button>
     <button
       class="tab-btn"
+      class:active={activeTab === 'simulator'}
+      onclick={() => activeTab = 'simulator'}
+      aria-current={activeTab === 'simulator' ? 'page' : undefined}
+    >
+      Simulator
+    </button>
+    <button
+      class="tab-btn"
       class:active={activeTab === 'settings'}
       onclick={() => activeTab = 'settings'}
+      aria-current={activeTab === 'settings' ? 'page' : undefined}
     >
       Settings
     </button>
@@ -114,9 +222,31 @@
   <!-- Page content -->
   <main class="content">
     {#if activeTab === 'main'}
-      <MainView {refreshTick} />
+      <MainView
+        {refreshTick}
+        {displayInverse}
+        {weekBarSegmented}
+        {a11yAnnounce}
+        {latestThreshold}
+      />
+    {:else if activeTab === 'simulator'}
+      <SimulatorView {displayInverse} {refreshTick} />
     {:else}
-      <SettingsView onSaved={() => { activeTab = 'main'; refreshTick += 1 }} {theme} onThemeChange={setTheme} />
+      <SettingsView
+        onSaved={() => { activeTab = 'main'; refreshTick += 1 }}
+        {themeMode}
+        {resolvedTheme}
+        onThemeModeChange={setThemeMode}
+        {skin}
+        onSkinChange={(s: Skin) => { skin = s }}
+        {displayInverse}
+        {trayMode}
+        {accentHex}
+        {a11yAnnounce}
+        {weekBarSegmented}
+        onWeekBarSegmentedChange={(v: boolean) => { weekBarSegmented = v }}
+        onDisplayPrefsChanged={onDisplayPrefsChanged}
+      />
     {/if}
   </main>
 </div>

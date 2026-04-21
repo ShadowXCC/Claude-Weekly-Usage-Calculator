@@ -18,12 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest       # Apple Silicon (ARM)
-            args: '--target aarch64-apple-darwin'
-            rust-targets: 'aarch64-apple-darwin'
-          - platform: macos-13           # Intel (x86_64)
-            args: '--target x86_64-apple-darwin'
-            rust-targets: 'x86_64-apple-darwin'
+          - platform: macos-latest       # Universal binary (ARM + Intel)
+            args: '--target universal-apple-darwin'
+            rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
           - platform: ubuntu-22.04
             args: ''
             rust-targets: ''
@@ -79,7 +76,7 @@ jobs:
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name || inputs.tag }}
-          releaseName: 'Claude Usage Tracker ${{ github.ref_name || inputs.tag }}'
+          releaseName: 'Claude Weekly Usage Calculator ${{ github.ref_name || inputs.tag }}'
           releaseBody: |
             ## What's Changed
 
@@ -90,8 +87,7 @@ jobs:
             | Platform | File |
             |----------|------|
             | Windows  | `.msi` installer |
-            | macOS (Apple Silicon) | `.dmg` |
-            | macOS (Intel) | `.dmg` |
+            | macOS (Universal) | `.dmg` (Apple Silicon + Intel) |
             | Linux | `.AppImage` or `.deb` |
           releaseDraft: true
           prerelease: false

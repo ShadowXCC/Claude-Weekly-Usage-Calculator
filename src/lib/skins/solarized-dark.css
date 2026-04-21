@@ -1,0 +1,17 @@
+/* Solarized Dark — Ethan Schoonover's muted teal base with warm yellow accent. */
+
+html[data-skin="solarized-dark"] {
+  --claude-orange:      #b58900;
+  --claude-orange-deep: #8a6800;
+  --claude-orange-glow: rgba(181, 137, 0, 0.25);
+  --claude-cream:       #002b36;
+  --claude-cream-dark:  #073642;
+  --claude-text:        #93a1a1;
+  --claude-text-muted:  #657b83;
+  --claude-border:      #586e75;
+  --claude-surface:     #073642;
+  --claude-track:       #094352;
+  --claude-success:     #859900;
+
+  color-scheme: dark;
+}

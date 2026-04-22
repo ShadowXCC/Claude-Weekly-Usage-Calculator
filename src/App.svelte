@@ -95,10 +95,30 @@
   let refreshInterval: ReturnType<typeof setInterval> | undefined
   let refreshTick: number = $state(0)
 
+  // ── Drag tracking for auto-hide-on-blur ─────────────────────
+  // Tauri's data-tauri-drag-region starts a WM move on mousedown, which on
+  // Linux fires Focused(false) for the whole drag. Tell the backend when a
+  // drag is in progress so it doesn't hide the window mid-drag.
+  const onDragMouseDown = (e: MouseEvent) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement | null
+    if (target?.closest('[data-tauri-drag-region]')) {
+      invoke('set_window_moving', { moving: true }).catch(() => {})
+    }
+  }
+  const onDragMouseUp = () => {
+    invoke('set_window_moving', { moving: false }).catch(() => {})
+  }
+
   onMount(async () => {
     // Hook up system theme listener.
     mql = window.matchMedia('(prefers-color-scheme: dark)')
     mql.addEventListener('change', onSystemThemeChange)
+
+    // Drag tracking for auto-hide-on-blur. Capture phase so we fire before
+    // Tauri's drag-region handler regardless of registration order.
+    window.addEventListener('mousedown', onDragMouseDown, true)
+    window.addEventListener('mouseup', onDragMouseUp, true)
 
     // Load display prefs from backend (they flow through get_usage_info).
     try {
@@ -125,6 +145,8 @@
     if (refreshInterval !== undefined) clearInterval(refreshInterval)
     mql?.removeEventListener('change', onSystemThemeChange)
     unlistenThreshold?.()
+    window.removeEventListener('mousedown', onDragMouseDown, true)
+    window.removeEventListener('mouseup', onDragMouseUp, true)
   })
 
   async function openUsagePage() {

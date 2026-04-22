@@ -1,8 +1,30 @@
 mod icon;
 pub mod usage;
 
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+// Set by the frontend while the user is holding the mouse down on the custom
+// titlebar drag region. The blur handler uses this to distinguish "user
+// clicked away" from "user is dragging the window" — the latter fires
+// WindowEvent::Focused(false) on Linux because _NET_WM_MOVERESIZE grabs the
+// pointer and steals focus for the duration of the drag.
+static WINDOW_MOVING: AtomicBool = AtomicBool::new(false);
+
+// Wall-clock ms at which the last WindowEvent::Moved fired. Under
+// _NET_WM_MOVERESIZE the WM sends ConfigureNotify events as the window is
+// dragged, so Moved is a reliable "drag is actively happening" pulse — used
+// as a belt-and-suspenders signal alongside WINDOW_MOVING in case the
+// frontend's mouseup never arrives.
+static LAST_MOVED_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 use chrono::{TimeZone, Utc};
 use chrono_tz::TZ_VARIANTS;
@@ -343,6 +365,11 @@ fn is_valid_hex(s: &str) -> bool {
 }
 
 #[tauri::command]
+fn set_window_moving(moving: bool) {
+    WINDOW_MOVING.store(moving, Ordering::SeqCst);
+}
+
+#[tauri::command]
 fn get_startup_enabled(app: AppHandle) -> bool {
     #[cfg(desktop)]
     { use tauri_plugin_autostart::ManagerExt; app.autolaunch().is_enabled().unwrap_or(false) }
@@ -496,11 +523,66 @@ pub fn run() {
 
             if let Some(win) = app.get_webview_window("main") {
                 let win_clone = win.clone();
-                win.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                win.on_window_event(move |event| match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
                         api.prevent_close();
                         let _ = win_clone.hide();
                     }
+                    tauri::WindowEvent::Moved(_) => {
+                        // Fires as the WM moves the window during a drag.
+                        LAST_MOVED_MS.store(now_ms(), Ordering::SeqCst);
+                    }
+                    tauri::WindowEvent::Focused(false) => {
+                        // _NET_WM_MOVERESIZE grabs the pointer for the whole
+                        // drag, so mouseup rarely reaches the app and the
+                        // window stays unfocused for many seconds. Wait
+                        // until BOTH signals agree the drag is over:
+                        //   - frontend flag WINDOW_MOVING is clear
+                        //   - no WindowEvent::Moved in the last 500ms
+                        // then re-check is_focused() before hiding.
+                        //
+                        // Reset LAST_MOVED_MS here so we only count Moved
+                        // events that arrive AFTER focus loss as drag
+                        // evidence. Without this, a stale Moved from
+                        // startup centering / workspace switches makes the
+                        // ordinary click-away hide feel laggy.
+                        LAST_MOVED_MS.store(0, Ordering::SeqCst);
+                        let win_for_check = win_clone.clone();
+                        std::thread::spawn(move || {
+                            // Grace period: absorbs WM focus flicker and
+                            // lets the frontend's mousedown IPC land.
+                            std::thread::sleep(Duration::from_millis(150));
+
+                            // Cap so a stuck flag (mouseup eaten by the WM)
+                            // can't pin this thread open forever — at the
+                            // deadline we force-clear WINDOW_MOVING so the
+                            // next blur behaves normally.
+                            let deadline = Instant::now() + Duration::from_secs(30);
+                            loop {
+                                let moving = WINDOW_MOVING.load(Ordering::SeqCst);
+                                let recent_move = now_ms().saturating_sub(
+                                    LAST_MOVED_MS.load(Ordering::SeqCst),
+                                ) < 500;
+                                if !moving && !recent_move {
+                                    break;
+                                }
+                                if Instant::now() >= deadline {
+                                    WINDOW_MOVING.store(false, Ordering::SeqCst);
+                                    break;
+                                }
+                                std::thread::sleep(Duration::from_millis(100));
+                            }
+                            // Let focus settle after the WM releases its grab.
+                            std::thread::sleep(Duration::from_millis(80));
+
+                            let still_unfocused = !win_for_check.is_focused().unwrap_or(true);
+                            let is_visible = win_for_check.is_visible().unwrap_or(false);
+                            if still_unfocused && is_visible {
+                                let _ = win_for_check.hide();
+                            }
+                        });
+                    }
+                    _ => {}
                 });
                 let _ = win.hide();
             }
@@ -514,6 +596,7 @@ pub fn run() {
             get_timezones,
             simulate_at,
             update_display_prefs,
+            set_window_moving,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

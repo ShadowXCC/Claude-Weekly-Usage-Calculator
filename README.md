@@ -1,47 +1,88 @@
-# Svelte + TS + Vite
+# Claude Weekly Usage Calculator
 
-This template should help get you started developing with Svelte and TypeScript in Vite.
+A desktop companion that helps you pace your Claude AI weekly usage at a glance.
 
-## Recommended IDE Setup
+## About
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
+This app is intended to help users of Claude AI pace their own weekly usage by providing a quick and easy place to check the suggested weekly usage based on the current moment and the weekly reset timer found on Claude's usage page.
 
-## Need an official Svelte framework?
+It runs as a tray app and a main window, showing you — right now, this minute — roughly how much of your weekly quota you "should" have used if you want to spread it evenly until the next reset.
 
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
+## What it does / does not do
 
-## Technical considerations
+**It does:**
 
-**Why use this over SvelteKit?**
+- Calculate a suggested weekly usage percentage based on where you are in your personal weekly cycle.
+- Show that percentage in the tray icon and in a main window gauge.
+- Let you adjust for sleep, simulate a future moment, and restyle the whole UI.
 
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
+**It does not:**
 
-This template contains as little as possible to get started with Vite + TypeScript + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
+- **Not** scrape, read, log in to, or sync anything from Claude's usage page.
+- **Not** connect to Anthropic's API or any network service. Your data stays on your machine.
+- **Not** know your reset time automatically — you must set it once in Settings to match the weekly reset shown on Claude's usage page.
 
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
+## Screenshots
 
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
+> _Placeholder — drop images into `docs/screenshots/` and they will render here._
 
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
+![Main gauge](docs/screenshots/main.png)
+![Tray icon modes](docs/screenshots/tray.png)
+![Settings panel](docs/screenshots/settings.png)
+![Usage simulator](docs/screenshots/simulator.png)
 
-**Why include `.vscode/extensions.json`?**
+## Features
 
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
+- **Configurable tray icon** — ring, number, or emoji modes
+- **In-app data visualization** — gauge arc, linear week bar, percentage readout
+- **User-set weekly reset time** — day of week, hour, minute, and timezone
+- **Sleep offset** — optional sleep-adjusted pacing so your "suggested" curve doesn't climb while you're asleep
+- **Simulated usage** — look-ahead view to preview what the gauge will read at a future moment
+- **14 premade themes / skins** — Default, CRT Green, LCD Seven-Seg, Early Mac, Solarized Dark/Light, Nord, Dracula, Catppuccin Mocha/Latte, GitHub Light, Sepia, Rose Pine Dawn, and more
+- **Configurable accent color** — custom hex
+- **Light / dark mode** and **inverse mode** (show remaining instead of used)
+- **Accessibility threshold announcements** at 50 / 75 / 90 / 100 %
+- **Autostart on boot**
+- Bundled `claude-usage` CLI binary for scripting / terminal use
 
-**Why enable `allowJs` in the TS template?**
+## Install (prebuilt)
 
-While `allowJs: false` would indeed prevent the use of `.js` files in the project, it does not prevent the use of JavaScript syntax in `.svelte` files. In addition, it would force `checkJs: false`, bringing the worst of both worlds: not being able to guarantee the entire codebase is TypeScript, and also having worse typechecking for the existing JavaScript. In addition, there are valid use cases in which a mixed codebase may be relevant.
+Prebuilt installers for **Windows, macOS, and Linux** are published on the [Releases page](https://github.com/ShadowXCC/Claude-Weekly-Usage-Calculator/releases).
 
-**Why is HMR not preserving my local component state?**
+**Linux**
 
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/rixo/svelte-hmr#svelte-hmr).
+```bash
+# Debian / Ubuntu
+sudo dpkg -i claude-weekly-usage-calculator_*.deb
 
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
+# Fedora / RHEL
+sudo rpm -i claude-weekly-usage-calculator-*.rpm
 
-```ts
-// store.ts
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+# AppImage (any distro)
+chmod +x Claude-Weekly-Usage-Calculator-*.AppImage
+./Claude-Weekly-Usage-Calculator-*.AppImage
 ```
+
+**Windows** — run the `.msi` installer.
+
+**macOS** — open the `.dmg` and drag the app into Applications.
+
+## Build from source
+
+Prerequisites: [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) (Rust toolchain + platform build tools) and Node.js.
+
+```bash
+npm install
+npm run tauri:dev      # run in development
+npm run tauri:build    # produce release bundles in src-tauri/target/release/bundle/
+```
+
+## Usage
+
+On first launch, open **Settings** and set your weekly reset time to match what Claude's usage page shows (day of week, hour, minute, timezone). Pick a tray icon mode and a theme if you like. From then on, the tray icon and main window will continuously show your suggested usage for the current moment.
+
+## License
+
+Licensed under the **GNU General Public License v3.0**. See [LICENSE](LICENSE) for the full text.
+
+Copyright © 2026 ShadowXCC
